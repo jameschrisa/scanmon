@@ -1,0 +1,26 @@
+{
+  "name": "scanmon",
+  "version": "1.0.1",
+  "description": "A ClamAV-based virus scanning application with file counting capability",
+  "main": "scanmon.js",
+  "scripts": {
+    "start": "node scanmon.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "clamav",
+    "virus",
+    "scan",
+    "security",
+    "file-count"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^8.2.5",
+    "cli-progress": "^3.11.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
