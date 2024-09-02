@@ -100,17 +100,53 @@ async function checkAndInstallDependencies() {
 }
 
 async function checkClamAVConfig() {
-  const configFile = os.platform() === 'darwin' 
-    ? '/opt/homebrew/etc/clamav/clamd.conf' 
-    : '/etc/clamav/clamd.conf';
+  const platform = os.platform();
+  let configFile;
+  let freshclamConfigFile;
+
+  if (platform === 'darwin') {
+    configFile = '/opt/homebrew/etc/clamav/clamd.conf';
+    freshclamConfigFile = '/opt/homebrew/etc/clamav/freshclam.conf';
+  } else if (platform === 'linux') {
+    configFile = '/etc/clamav/clamd.conf';
+    freshclamConfigFile = '/etc/clamav/freshclam.conf';
+  } else {
+    console.log("Unsupported operating system. Cannot check ClamAV configuration.");
+    return;
+  }
 
   try {
+    await fs.access(configFile, fs.constants.R_OK);
     const config = await fs.readFile(configFile, 'utf8');
     if (!config.includes('TCPSocket') && !config.includes('LocalSocket')) {
       console.log("Warning: ClamAV configuration may not have TCP or Unix socket enabled.");
     }
+    console.log("ClamAV configuration file found and is accessible.");
   } catch (error) {
-    console.log("Warning: ClamAV configuration file not found or inaccessible.");
+    console.log(`Warning: ClamAV configuration file (${configFile}) not found or inaccessible.`);
+    console.log("This may indicate that ClamAV is not properly installed or configured.");
+    
+    if (platform === 'darwin') {
+      console.log("For macOS users:");
+      console.log("1. Ensure ClamAV is installed: brew install clamav");
+      console.log("2. Run: sudo cp /opt/homebrew/etc/clamav/freshclam.conf.sample /opt/homebrew/etc/clamav/freshclam.conf");
+      console.log("3. Edit the freshclam.conf file to uncomment the 'DatabaseMirror' line.");
+      console.log("4. Run: sudo freshclam");
+    } else if (platform === 'linux') {
+      console.log("For Linux users:");
+      console.log("1. Ensure ClamAV is installed. On Ubuntu/Debian: sudo apt-get install clamav");
+      console.log("2. Check if the configuration files exist in /etc/clamav/");
+      console.log("3. If not, you may need to create them or reinstall ClamAV");
+    }
+  }
+
+  // Check freshclam configuration
+  try {
+    await fs.access(freshclamConfigFile, fs.constants.R_OK);
+    console.log("Freshclam configuration file found and is accessible.");
+  } catch (error) {
+    console.log(`Warning: Freshclam configuration file (${freshclamConfigFile}) not found or inaccessible.`);
+    console.log("This may affect the ability to update virus definitions.");
   }
 }
 
@@ -156,6 +192,17 @@ async function countFiles(directory) {
   return fileCount;
 }
 
+async function getDatabaseAge(dbPath) {
+  try {
+    const stats = await fs.stat(dbPath);
+    const ageInDays = (Date.now() - stats.mtime) / (1000 * 60 * 60 * 24);
+    return ageInDays;
+  } catch (error) {
+    console.error(`Error checking database: ${error.message}`);
+    return null;
+  }
+}
+
 module.exports = {
   checkSudo,
   checkSystemCompatibility,
@@ -166,5 +213,6 @@ module.exports = {
   checkAndInstallDependencies,
   checkClamAVConfig,
   getVulnerableDirectories,
-  countFiles
+  countFiles,
+  getDatabaseAge
 };

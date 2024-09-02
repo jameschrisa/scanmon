@@ -1,15 +1,16 @@
 // scanmon.js
 const inquirer = require('inquirer');
-const { checkSudo, checkSystemCompatibility, ensureDirectories, checkAndInstallDependencies, checkClamAVConfig, checkDirectoryPermissions, getVulnerableDirectories } = require('./utils');
-const { updateDatabase, runScan, countFiles } = require('./scanner');
+const { checkSudo, checkSystemCompatibility, ensureDirectories, checkAndInstallDependencies, checkClamAVConfig, checkDirectoryPermissions, getVulnerableDirectories, getDatabaseAge } = require('./utils');
+const { runScan, countFiles } = require('./scanner');
 const os = require('os');
+const { spawn } = require('child_process');
 
 const APP_NAME = "ScanMon";
 const LAST_UPDATED = "2024-09-01";
 const SCAN_TIMEOUT = 600000; // 10 minute timeout
 
 console.log(`Welcome to ${APP_NAME}!`);
-console.log(`This application uses ClamAV and Freshclam for virus scanning and database updates.`);
+console.log(`This application uses ClamAV for virus scanning.`);
 console.log(`Last updated: ${LAST_UPDATED}\n`);
 
 let currentScanProcess = null;
@@ -25,6 +26,52 @@ function cleanup() {
 process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
 
+async function checkAndPromptDatabaseUpdate() {
+  const dbPath = os.platform() === 'darwin' 
+    ? '/opt/homebrew/var/lib/clamav/main.cvd'
+    : '/var/lib/clamav/main.cvd';
+  
+  const ageInDays = await getDatabaseAge(dbPath);
+
+  if (ageInDays === null) {
+    console.log("Unable to check database age. You may need to update manually.");
+    return;
+  }
+
+  console.log(`ClamAV database is approximately ${ageInDays.toFixed(1)} days old.`);
+
+  if (ageInDays > 7) {
+    console.log("Your database is more than a week old. It's recommended to update.");
+    const { shouldUpdate } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'shouldUpdate',
+        message: 'Do you want to update the database now?',
+        default: true
+      }
+    ]);
+
+    if (shouldUpdate) {
+      console.log("Updating database. This may take a few minutes...");
+      const updateProcess = spawn('node', ['update-database.js'], { stdio: 'inherit' });
+      await new Promise((resolve) => {
+        updateProcess.on('close', (code) => {
+          if (code === 0) {
+            console.log("Database updated successfully.");
+          } else {
+            console.log("Database update failed. You may need to run 'sudo freshclam' manually.");
+          }
+          resolve();
+        });
+      });
+    } else {
+      console.log("Skipping database update. Note that this may affect scan accuracy.");
+    }
+  } else {
+    console.log("Your database is up to date.");
+  }
+}
+
 async function main() {
   try {
     checkSudo();
@@ -38,29 +85,7 @@ async function main() {
       : '/var/lib/clamav';
     await checkDirectoryPermissions(clamavDir);
 
-    const { updateChoice } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'updateChoice',
-        message: 'Do you want to update the ClamAV database?',
-        choices: ['Yes', 'No, I have manually updated it', 'Skip update and continue with scan']
-      }
-    ]);
-
-    if (updateChoice === 'Yes') {
-      try {
-        await updateDatabase();
-      } catch (dbError) {
-        console.log("Error updating database. You may need to update manually.");
-        console.log("Run: sudo freshclam");
-        console.log("Then run this script again and choose 'No, I have manually updated it'.");
-        process.exit(1);
-      }
-    } else if (updateChoice === 'No, I have manually updated it') {
-      console.log("Skipping database update as it has been manually updated.");
-    } else {
-      console.log("Skipping database update. Note that this may affect scan accuracy.");
-    }
+    await checkAndPromptDatabaseUpdate();
 
     const vulnerableDirectories = getVulnerableDirectories();
     const { scanChoice } = await inquirer.prompt([
