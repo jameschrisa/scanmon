@@ -1,3 +1,5 @@
+![banner](./scanmon.png "scanmon")
+
 # ScanMon
 
 ScanMon is a Node.js-based command-line interface (CLI) tool that leverages ClamAV for virus scanning and database updates. It provides an easy-to-use interface for scanning various directories on your system for potential threats.
@@ -55,6 +57,57 @@ ScanMon uses default paths for ClamAV configuration and databases. If your ClamA
 
 - `utils.js`: Update the `ensureDirectories` function with the correct paths for your system.
 - `scanner.js`: Modify the `updateDatabase` function if your `freshclam` command requires different parameters.
+
+
+On a Darwin-based system (macOS), some paths are more vulnerable to malware and exploitation than others. Here's a breakdown of paths to prioritize for scanning and those that can be skipped:
+
+# High-priority paths to scan:
+### System directories:
+/System/Library/
+/Library/
+/usr/lib/
+/usr/local/lib/
+### Application directories:
+/Applications/
+~/Applications/ (user-specific)
+### Script directories:
+/etc/rc.d/
+/etc/init.d/
+/Library/StartupItems/
+### User directories:
+~/Downloads/
+~/Documents/
+~/Desktop/
+### Log files:
+/var/log/
+# Medium-priority paths to scan:
+### Cache directories:
+~/Library/Caches/
+/var/cache/
+### Temporary directories:
+~/Library/Application Support/
+/var/tmp/
+### Network directories:
+/Network/
+/Volumes/ (network-mounted volumes)
+# Low-priority paths or skip:
+### System files:
+/System/Library/CoreServices/
+/usr/standalone/
+### Cache and temporary files:
+/private/var/folders/ (system cache)
+/private/var/tmp/ (system temporary files)
+### Backup directories:
+~/Library/Application Support/Backup/
+/private/var/backup/
+
+# Note:
+* Be cautious when scanning system directories, as false positives can occur.
+* Prioritize scanning directories with executable files (e.g., .app, .bundle, .dylib, .so).
+* Consider excluding directories with known safe files, like system fonts or language resources.
+* Regularly update your antivirus software to ensure the latest malware signatures and detection capabilities.
+* Keep in mind that this is not an exhaustive list, and specific use cases may require additional paths to be scanned. 
+* Always consult your antivirus software's documentation for recommended scanning paths and configurations.
 
 ## Contributing
 
